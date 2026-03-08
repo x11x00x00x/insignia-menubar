@@ -2,7 +2,11 @@
 
 A macOS menubar app that shows **Insignia Stats** game activity, lets you **log in** to see **friends online**, and **notifies you** when friends come online or when a lobby is up for games you care about.
 
+<img width="313" height="440" alt="Screenshot 2026-03-08 at 1 46 03 PM" src="https://github.com/user-attachments/assets/31389925-34f7-40ab-9554-16dfecc1bd64" />
+
 ## Features
+
+<img width="367" height="164" alt="Screenshot 2026-03-08 at 1 46 17 PM" src="https://github.com/user-attachments/assets/c85c9de5-f3eb-48d4-9b78-5c31588b6dbe" />
 
 ### Menubar & popover
 - **Menubar icon** – Shows “Insignia Stats” or “X game(s) · Insignia” in the menu bar. Click to open the popover.
@@ -17,6 +21,8 @@ A macOS menubar app that shows **Insignia Stats** game activity, lets you **log 
 - **Events** – Optional notification about **5 minutes before** scheduled events for selected games (from Insignia Stats events).
 - **Permission** – When you turn on any notification option (friend, event, or check a game for lobby), the app will prompt for notification permission if needed, or open System Settings so you can allow notifications for the app.
 - **Quiet hours** – “Only notify during these hours” in Settings lets you restrict notifications to certain time ranges (e.g. 9 AM–5 PM). Leave empty for all day.
+  
+<img width="813" height="844" alt="Screenshot 2026-03-08 at 1 45 52 PM" src="https://github.com/user-attachments/assets/8814d30e-62a6-4bc8-8640-dcf587357538" />
 
 ### Settings (Notification Settings…)
 - **Time online** – This session and total time open.
