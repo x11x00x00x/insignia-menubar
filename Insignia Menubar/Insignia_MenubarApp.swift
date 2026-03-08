@@ -11,8 +11,13 @@ import SwiftUI
 struct Insignia_MenubarApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     var body: some Scene {
-        Settings {
-            EmptyView() // Just needed to satisfy the 'some Scene' requirement
+        // No Settings scene — it was opening an empty window. Minimal WindowGroup so the app has
+        // a scene; AppDelegate closes the empty window at launch and when opening our Settings.
+        WindowGroup {
+            EmptyView()
+        }
+        .commands {
+            CommandGroup(replacing: .appSettings) { }
         }
     }
 }
