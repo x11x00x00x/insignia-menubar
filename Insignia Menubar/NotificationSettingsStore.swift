@@ -27,6 +27,16 @@ enum NotificationSettingsStore {
     private static let notifyEventsKey = "notification_events"
     private static let refreshIntervalKey = "settings_refresh_interval_minutes"
     private static let totalTimeOnlineKey = "settings_total_time_online_seconds"
+    private static let launchAtLoginKey = "settings_launch_at_login"
+
+    /// When true, open the app when the user logs in (stored preference; actual registration via LaunchAtLogin).
+    static var launchAtLogin: Bool {
+        get {
+            if UserDefaults.standard.object(forKey: launchAtLoginKey) == nil { return false }
+            return UserDefaults.standard.bool(forKey: launchAtLoginKey)
+        }
+        set { UserDefaults.standard.set(newValue, forKey: launchAtLoginKey) }
+    }
 
     /// When true, show a notification when a friend comes online.
     static var notifyWhenFriendComesOnline: Bool {

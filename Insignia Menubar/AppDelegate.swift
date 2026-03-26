@@ -52,6 +52,21 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSPopoverDel
         startRefreshTimer()
         fetchAndUpdateMenu()
         hideOrCloseEmptySwiftUIWindow()
+        startDiscordPresenceIfNeeded()
+        if NotificationSettingsStore.launchAtLogin && !LaunchAtLogin.isEnabled {
+            _ = LaunchAtLogin.setEnabled(true)
+        }
+
+        // When launched at login, the menu bar may not be ready yet; briefly switch activation
+        // policy so the status item becomes visible. Only when not already active (login launch).
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+            guard self?.statusItem != nil, !NSApp.isActive else { return }
+            NSApp.setActivationPolicy(.regular)
+            NSApp.activate(ignoringOtherApps: true)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                NSApp.setActivationPolicy(.accessory)
+            }
+        }
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {
@@ -242,10 +257,48 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSPopoverDel
         KeychainHelper.clearSession()
         lastFriends = nil
         lastOnlineFriendGamertags = nil
+        DiscordPresenceManager.stopChecking()
         fetchAndUpdateMenu()
         closePopover()
         let (games, _, isLoggedIn) = currentPopoverGamesAndFriends()
         popoverContentVC?.rebuildContent(games: games, friends: [], isLoggedIn: isLoggedIn)
+    }
+
+    /// If user had Discord connected before, reconnect on launch so they stay connected after app restart.
+    /// Presence updates only run when also logged in to Insignia.
+    private func startDiscordPresenceIfNeeded() {
+        guard DiscordPresenceStore.discordUser != nil else { return }
+        DiscordRPCService.connect { [weak self] result in
+            switch result {
+            case .success:
+                if KeychainHelper.getSessionKey() != nil {
+                    DiscordPresenceManager.startChecking()
+                }
+            case .failure:
+                DiscordPresenceStore.clearOnLogout()
+            }
+        }
+    }
+
+    func connectDiscord(completion: @escaping (Result<DiscordUser, Error>) -> Void) {
+        DiscordRPCService.connect { [weak self] result in
+            switch result {
+            case .success(let user):
+                DiscordPresenceStore.discordUser = user
+                if KeychainHelper.getSessionKey() != nil {
+                    DiscordPresenceManager.startChecking()
+                }
+                completion(.success(user))
+            case .failure(let error):
+                completion(.failure(error))
+            }
+        }
+    }
+
+    func disconnectDiscord() {
+        DiscordRPCService.disconnect()
+        DiscordPresenceManager.stopChecking()
+        DiscordPresenceStore.clearOnLogout()
     }
 
     @objc private func menubarWindowDidClose() {

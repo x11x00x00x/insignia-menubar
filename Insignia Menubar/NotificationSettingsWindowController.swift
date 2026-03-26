@@ -35,6 +35,13 @@ final class NotificationSettingsWindowController: NSWindowController, NSTableVie
     private var refreshIntervalPopUp: NSPopUpButton?
     private var timeUpdateTimer: Timer?
     private var mainScrollView: NSScrollView!
+    private var discordStatusLabel: NSTextField?
+    private var discordPresenceStatusLabel: NSTextField?  // "Showing as: Online" / "Showing as: Offline"
+    private var discordGameLabel: NSTextField?            // "Game: Halo 2" or "Game: —"
+    private var discordLastCheckLabel: NSTextField?     // "Last checked: 3:45 PM"
+    private var discordConnectButton: NSButton?
+    private var discordDisconnectButton: NSButton?
+    private var launchAtLoginCheckbox: NSButton?
 
     func setGameList(from onlineUsers: OnlineUsersResponse) {
         gameNames = onlineUsers.keys.sorted()
@@ -96,9 +103,59 @@ final class NotificationSettingsWindowController: NSWindowController, NSTableVie
         refreshRow.addArrangedSubview(popUp)
         stack.addArrangedSubview(refreshRow)
 
+        let launchAtLoginCheck = NSButton(checkboxWithTitle: "Open at login", target: self, action: #selector(launchAtLoginToggled(_:)))
+        launchAtLoginCheck.state = LaunchAtLogin.isEnabled ? .on : .off
+        launchAtLoginCheckbox = launchAtLoginCheck
+        stack.addArrangedSubview(launchAtLoginCheck)
+
         let sep1 = NSBox()
         sep1.boxType = .separator
         stack.addArrangedSubview(sep1)
+
+        // Discord Rich Presence
+        let discordLabel = NSTextField(labelWithString: "Discord Rich Presence")
+        discordLabel.font = .boldSystemFont(ofSize: NSFont.systemFontSize)
+        stack.addArrangedSubview(discordLabel)
+        let discordDesc = NSTextField(labelWithString: "Show your Insignia status (game and username) on Discord. Requires Discord app to be running.")
+        discordDesc.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+        discordDesc.textColor = .secondaryLabelColor
+        discordDesc.maximumNumberOfLines = 2
+        stack.addArrangedSubview(discordDesc)
+        let discordStatus = NSTextField(labelWithString: "Not connected")
+        discordStatus.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+        discordStatusLabel = discordStatus
+        stack.addArrangedSubview(discordStatus)
+        let discordPresenceStatus = NSTextField(labelWithString: "")
+        discordPresenceStatus.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+        discordPresenceStatusLabel = discordPresenceStatus
+        stack.addArrangedSubview(discordPresenceStatus)
+        let discordGame = NSTextField(labelWithString: "")
+        discordGame.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+        discordGame.textColor = .secondaryLabelColor
+        discordGameLabel = discordGame
+        stack.addArrangedSubview(discordGame)
+        let discordLastCheck = NSTextField(labelWithString: "")
+        discordLastCheck.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+        discordLastCheck.textColor = .secondaryLabelColor
+        discordLastCheckLabel = discordLastCheck
+        stack.addArrangedSubview(discordLastCheck)
+        let discordBtnRow = NSStackView(views: [])
+        discordBtnRow.orientation = .horizontal
+        discordBtnRow.spacing = 8
+        let connectBtn = NSButton(title: "Connect to Discord", target: self, action: #selector(discordConnectTapped))
+        connectBtn.bezelStyle = .rounded
+        discordConnectButton = connectBtn
+        let disconnectBtn = NSButton(title: "Disconnect", target: self, action: #selector(discordDisconnectTapped))
+        disconnectBtn.bezelStyle = .rounded
+        discordDisconnectButton = disconnectBtn
+        discordBtnRow.addArrangedSubview(connectBtn)
+        discordBtnRow.addArrangedSubview(disconnectBtn)
+        stack.addArrangedSubview(discordBtnRow)
+        updateDiscordUI()
+
+        let sep1b = NSBox()
+        sep1b.boxType = .separator
+        stack.addArrangedSubview(sep1b)
 
         // Friends notification
         let friendsCheck = NSButton(checkboxWithTitle: "Notify when a friend comes online", target: self, action: #selector(friendsNotificationToggled(_:)))
@@ -265,6 +322,13 @@ final class NotificationSettingsWindowController: NSWindowController, NSTableVie
         }
     }
 
+    @objc private func launchAtLoginToggled(_ sender: NSButton) {
+        let enabled = (sender.state == .on)
+        NotificationSettingsStore.launchAtLogin = enabled
+        _ = LaunchAtLogin.setEnabled(enabled)
+        launchAtLoginCheckbox?.state = LaunchAtLogin.isEnabled ? .on : .off
+    }
+
     @objc private func refreshIntervalChanged(_ sender: NSPopUpButton) {
         let minutes = [1, 3, 5, 10, 15][sender.indexOfSelectedItem]
         NotificationSettingsStore.refreshIntervalMinutes = minutes
@@ -306,12 +370,76 @@ final class NotificationSettingsWindowController: NSWindowController, NSTableVie
         return "\(mins) min"
     }
 
+    private func updateDiscordUI() {
+        let connected = DiscordPresenceStore.discordUser != nil && DiscordRPCService.connected
+        if connected {
+            discordStatusLabel?.stringValue = "Connected" + (DiscordPresenceStore.discordUser.map { " as \($0.username)" } ?? "")
+            let active = DiscordPresenceStore.presenceActive
+            discordPresenceStatusLabel?.stringValue = "Showing as: " + (active ? "Online" : "Offline")
+            discordPresenceStatusLabel?.isHidden = false
+            if active, let game = DiscordPresenceStore.lastGameName, !game.isEmpty {
+                discordGameLabel?.stringValue = "Game: \(game)"
+            } else if active {
+                discordGameLabel?.stringValue = "Game: OG Xbox"
+            } else {
+                discordGameLabel?.stringValue = "Insignia reports you're offline. Go online in a game to see status on Discord."
+            }
+            discordGameLabel?.isHidden = false
+            if let lastCheck = DiscordPresenceStore.lastCheck, let date = ISO8601DateFormatter().date(from: lastCheck) {
+                let formatter = DateFormatter()
+                formatter.dateStyle = .none
+                formatter.timeStyle = .short
+                discordLastCheckLabel?.stringValue = "Last checked: \(formatter.string(from: date))"
+            } else {
+                discordLastCheckLabel?.stringValue = ""
+            }
+            discordLastCheckLabel?.isHidden = (discordLastCheckLabel?.stringValue.isEmpty ?? true)
+            discordConnectButton?.isHidden = true
+            discordDisconnectButton?.isHidden = false
+        } else {
+            discordStatusLabel?.stringValue = "Not connected"
+            discordPresenceStatusLabel?.isHidden = true
+            discordGameLabel?.isHidden = true
+            discordLastCheckLabel?.isHidden = true
+            discordConnectButton?.isHidden = false
+            discordDisconnectButton?.isHidden = true
+        }
+    }
+
+    @objc private func discordConnectTapped() {
+        discordConnectButton?.isEnabled = false
+        discordConnectButton?.title = "Connecting…"
+        appDelegate?.connectDiscord { [weak self] result in
+            DispatchQueue.main.async {
+                self?.discordConnectButton?.isEnabled = true
+                self?.discordConnectButton?.title = "Connect to Discord"
+                self?.updateDiscordUI()
+                if case .failure(let error) = result {
+                    let alert = NSAlert()
+                    alert.messageText = "Discord connection failed"
+                    alert.informativeText = error.localizedDescription
+                    alert.alertStyle = .warning
+                    alert.runModal()
+                }
+            }
+        }
+    }
+
+    @objc private func discordDisconnectTapped() {
+        appDelegate?.disconnectDiscord()
+        updateDiscordUI()
+    }
+
     override func showWindow(_ sender: Any?) {
         loadWindow()
         loadTimeRanges()
         timeRangesTable.reloadData()
+        updateDiscordUI()
         friendsNotificationCheckbox?.state = NotificationSettingsStore.notifyWhenFriendComesOnline ? .on : .off
         eventsNotificationCheckbox?.state = NotificationSettingsStore.notifyForEvents ? .on : .off
+        let launchEnabled = LaunchAtLogin.isEnabled
+        launchAtLoginCheckbox?.state = launchEnabled ? .on : .off
+        NotificationSettingsStore.launchAtLogin = launchEnabled
         let idx = [1, 3, 5, 10, 15].firstIndex(of: NotificationSettingsStore.refreshIntervalMinutes) ?? 2
         refreshIntervalPopUp?.selectItem(at: idx)
         updateTimeLabels()

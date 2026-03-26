@@ -164,6 +164,23 @@ final class StatusBarPopoverViewController: NSViewController, NSTableViewDataSou
             newRows.append(.separator())
         }
 
+        // Discord status (informational) — show connection, online/offline, and game like XBLBeacon
+        let discordConnected = DiscordPresenceStore.discordUser != nil && DiscordRPCService.connected
+        let discordTitle: String
+        if discordConnected {
+            let presence = DiscordPresenceStore.presenceActive ? "Online" : "Offline"
+            if DiscordPresenceStore.presenceActive, let game = DiscordPresenceStore.lastGameName, !game.isEmpty {
+                discordTitle = "Discord: Connected · \(presence) · Playing \(game)"
+            } else if DiscordPresenceStore.presenceActive {
+                discordTitle = "Discord: Connected · \(presence) · OG Xbox"
+            } else {
+                discordTitle = "Discord: Connected · \(presence)"
+            }
+        } else {
+            discordTitle = "Discord: Not connected"
+        }
+        newRows.append(PopoverRow(title: discordTitle, isSectionHeader: false, isSeparator: false, isPlaceholderGray: !discordConnected, action: .notificationSettings))
+
         if !isLoggedIn {
             newRows.append(PopoverRow(title: "Login to Insignia (xb.live)", isSectionHeader: false, isSeparator: false, isPlaceholderGray: false, action: .login))
         }

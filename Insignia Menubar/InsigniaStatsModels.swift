@@ -43,3 +43,9 @@ struct EventInfo: Codable {
     let game_name: String?
     let title_id: String?
 }
+
+/// Response from POST /api/me/profile-live (live Insignia status for Discord presence)
+struct ProfileLiveResponse: Codable {
+    let isOnline: Bool?
+    let game: String?
+}
